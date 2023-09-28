@@ -1,0 +1,168 @@
+version: "2"
+services:
+  qbittorrent:
+    image: linuxserver/qbittorrent
+    container_name: qbittorrent
+    environment:
+      - PUID=1024
+      - PGID=101
+      - TZ=Europe/London
+      - UMASK_SET=022
+      - WEBUI_PORT=8090
+    volumes:
+      - /volume1/dockerdata/qbt/config:/config
+      - /volume1/video/Seeding:/downloads
+      - /volume1/video/Downloads:/tvdownloads
+      - /volume1/video/FilmDownloads:/filmdownloads
+      - /volume1/video/MusicDownloads:/musicdownloads
+      - ./hosts:/etc/hosts
+     # Mount the hosts file
+    ports:
+      # QBT UI Port
+      - 8090:8090
+      # Bittorrent port
+      - 6882:6882
+      - 6882:6882/udp
+    restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+      - 8.8.4.4
+    networks:
+      - my_network
+
+  prowlarr:
+    image: linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=1024
+      - PGID=101
+      - TZ=GB
+    volumes:
+      - /volume1/dockerdata/prowlarr:/config
+      - ./hosts:/etc/hosts
+ # Mount the hosts file
+    restart: unless-stopped
+    depends_on:
+      - qbittorrent
+    networks:
+      - my_network
+
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr_v3
+    environment:
+      - PUID=1024
+      - PGID=101
+      - TZ=GB
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /volume1/dockerdata/sonarr/config:/config
+      - /volume1/video/TV:/tv
+      - /volume1/video/Downloads:/downloads
+      - ./hosts:/etc/hosts
+    # Mount the hosts file
+    ports:
+      # Sonarr port
+      - 8989:8989
+    restart: unless-stopped
+    depends_on:
+      - prowlarr
+      - qbittorrent
+    networks:
+      - my_network
+
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr_v3
+    environment:
+      - PUID=1024
+      - PGID=101
+      - TZ=GB
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /volume1/dockerdata/radarr3/config:/config
+      - /volume1/video/Films:/movies
+      - /volume1/video/FilmDownloads:/downloads
+      - ./hosts:/etc/hosts
+     # Mount the hosts file
+    ports:
+      # Radarr port
+      - 7878:7878
+    restart: unless-stopped
+    depends_on:
+      - prowlarr
+      - qbittorrent
+    networks:
+      - my_network
+
+  lidarr:
+    image: linuxserver/lidarr
+    container_name: lidarr
+    environment:
+      - PUID=1024
+      - PGID=101
+      - TZ=GB
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /volume1/dockerdata/lidarr/config:/config
+      - /volume1/music:/music
+      - /volume1/video/MusicDownloads:/downloads
+      - ./hosts:/etc/hosts
+    # Mount the hosts file
+    restart: unless-stopped
+    depends_on:
+      - prowlarr
+      - qbittorrent
+    networks:
+      - my_network
+
+  plex:
+    container_name: plex
+    image: linuxserver/plex
+    devices:
+      - /dev/dri:/dev/dri
+    privileged: true
+    environment:
+      PGID: "101"
+      PUID: "1024"
+      VERSION: docker
+    ports:
+      - 32400:32400/tcp # Map Plex web UI port
+    restart: unless-stopped
+    volumes:
+      - /volume1/dockerdata/plex:/config:rw
+      - /volume1/video/TV:/tv:rw
+      - /volume1/video/Films:/movies:rw
+      - /volume1/music:/music:rw
+      - /volume1/video/Seeding:/seeding:rw
+      - ./hosts:/etc/hosts
+    # Mount the hosts file
+    networks:
+      - my_network
+
+  get_player:
+    container_name: get_iplayer
+    image: kolonuk/get_iplayer
+    environment:
+      PGID: "101"
+      PUID: "1024"
+    ports:
+      - 8181:8181/tcp
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /volume1/dockerdata/get_iplayer:/root/.get_iplayer:rw
+      - /volume1/video/Downloads/iPlayer:/root/output:rw
+      - ./hosts:/etc/hosts
+  # Mount the hosts file
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16 # Define your subnet if needed
